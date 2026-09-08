@@ -14,7 +14,7 @@ const TECH_OPTIONS = [
   'MongoDB', 'AWS', 'Docker', 'Firebase', 'Java', 'Spring Boot', 'PHP', 'Vue.js',
 ];
 
-const MIN_IMAGES = 5;
+const MIN_IMAGES = 2;
 const MAX_IMAGE_MB = 10;
 
 export default function AddProject() {
@@ -83,6 +83,7 @@ export default function AddProject() {
       toast('Select at least one technology.', 'error');
       return;
     }
+    //number of images count
     if (images.length < MIN_IMAGES) {
       toast(`Please upload at least ${MIN_IMAGES} project images.`, 'error');
       window.scrollTo({ top: 0, behavior: 'smooth' });
