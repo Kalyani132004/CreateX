@@ -232,104 +232,154 @@ class MeView(View):
             status=response.status_code,
             safe=isinstance(data, dict),
         )
+PROJECT_SERVICE_URL = "http://127.0.0.1:8002"
 
-# Auth service URL
-PROJECTS_SERVICE_URL = "http://127.0.0.1:8002"
-class addProjects(View):
-    def dispatch_request(self, request):
-            # Check methods
-            if request.method not in [
-                "GET",
-                "POST",
-                "PUT",
-                "PATCH",
-                "DELETE",
-            ]:
-                return JsonResponse(
-                    {"detail": "Method not allowed"},
-                    status=405
-                )
 
-            # Parse JSON body
-            body = None
+@method_decorator(csrf_exempt, name="dispatch")
+class ProjectProxyView(View):
 
-            if request.body:
-                try:
-                    body = json.loads(
-                        request.body.decode("utf-8")
-                    )
-                except json.JSONDecodeError:
-                    return JsonResponse(
-                        {"detail": "Invalid JSON body"},
-                        status=400
-                    )
+    def dispatch_request(self, request, path=""):
 
-            # Build target Auth Service URL
-            target_url = (
-                f"{PROJECTS_SERVICE_URL}/project/add/projects"
+        if request.method not in [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+        ]:
+            return JsonResponse(
+                {"detail": "Method not allowed"},
+                status=405
             )
 
-            # Forward query parameters
-            query_params = request.GET.dict()
+        target_url = f"{PROJECT_SERVICE_URL}/projects/{path}"
 
-            # Forward required headers
-            forwarded_headers = {}
+        query_params = request.GET.dict()
 
-            for header_key, header_value in request.headers.items():
+        forwarded_headers = {}
 
-                if header_key.lower() not in _EXCLUDED_REQUEST_HEADERS:
-                    forwarded_headers[header_key] = header_value
+        for header_key, header_value in request.headers.items():
 
-            try:
-                #send the response to the auth service
+            if header_key.lower() not in _EXCLUDED_REQUEST_HEADERS:
+                forwarded_headers[header_key] = header_value
+
+        try:
+
+            # Handle file upload
+            if request.content_type.startswith("multipart/form-data"):
+
+                data = request.POST.copy()
+
+                files = []
+
+                for key in request.FILES:
+
+                    for uploaded_file in request.FILES.getlist(key):
+                        files.append(
+                            (
+                                key,
+                                (
+                                    uploaded_file.name,
+                                    uploaded_file.file,
+                                    uploaded_file.content_type
+                                )
+                            )
+                        )
+
+                response = requests.request(
+                    method=request.method,
+                    url=target_url,
+                    data=data,
+                    files=files,
+                    params=query_params,
+                    headers=forwarded_headers,
+                    timeout=30,
+                )
+
+            else:
+
+                body = None
+
+                if request.body:
+
+                    try:
+                        body = json.loads(
+                            request.body.decode("utf-8")
+                        )
+
+                    except json.JSONDecodeError:
+                        return JsonResponse(
+                            {"detail": "Invalid JSON body"},
+                            status=400
+                        )
+
                 response = requests.request(
                     method=request.method,
                     url=target_url,
                     json=body,
                     params=query_params,
                     headers=forwarded_headers,
-                    timeout=10,
+                    timeout=30,
                 )
 
-            except requests.exceptions.ConnectionError:
-                return JsonResponse(
-                    {
-                        "detail": (
-                            "Auth Service is unavailable. "
-                            "Make sure Django Auth Service "
-                            "is running on port 8001."
-                        )
-                    },
-                    status=503,
-                )
-
-            except requests.exceptions.Timeout:
-                return JsonResponse(
-                    {
-                        "detail": "Auth Service request timed out."
-                    },
-                    status=504,
-                )
-
-            except requests.exceptions.RequestException as exc:
-                return JsonResponse(
-                    {
-                        "detail": f"Auth Service request failed: {exc}"
-                    },
-                    status=502,
-                )
-
-            # Parse Auth Service response
-            try:
-                data = response.json()
-
-            except ValueError:
-                data = {
-                    "detail": response.text
-                }
+        except requests.exceptions.ConnectionError:
 
             return JsonResponse(
-                data,
-                status=response.status_code,
-                safe=isinstance(data, dict),
+                {
+                    "detail": (
+                        "Project Service is unavailable. "
+                        "Make sure Project Service "
+                        "is running on port 8002."
+                    )
+                },
+                status=503,
             )
+
+        except requests.exceptions.Timeout:
+
+            return JsonResponse(
+                {
+                    "detail": "Project Service request timed out."
+                },
+                status=504,
+            )
+
+        except requests.exceptions.RequestException as exc:
+
+            return JsonResponse(
+                {
+                    "detail": f"Project Service request failed: {exc}"
+                },
+                status=502,
+            )
+
+        try:
+
+            data = response.json()
+
+        except ValueError:
+
+            data = {
+                "detail": response.text
+            }
+
+        return JsonResponse(
+            data,
+            status=response.status_code,
+            safe=isinstance(data, dict),
+        )
+
+    def get(self, request, path=""):
+        return self.dispatch_request(request, path)
+
+    def post(self, request, path=""):
+        return self.dispatch_request(request, path)
+
+    def put(self, request, path=""):
+        return self.dispatch_request(request, path)
+
+    def patch(self, request, path=""):
+        return self.dispatch_request(request, path)
+
+    def delete(self, request, path=""):
+        return self.dispatch_request(request, path)
