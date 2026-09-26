@@ -96,7 +96,7 @@ export default function AddProject() {
     formData.append('domain', domain);
     formData.append('course', course);
     formData.append('batch', batch);
-    [...techs].forEach((t) => formData.append('technologies', t));
+    formData.append("technologies", JSON.stringify([...techs]));
     images.forEach(({ file }) => formData.append('images', file));
     if (docFile) formData.append('documentation', docFile);
     if (videoFile) formData.append('screen_recording', videoFile);
@@ -105,7 +105,7 @@ export default function AddProject() {
     try {
       await projectService.create(formData);
       toast('Project submitted successfully.');
-      navigate('/student/projects');
+      navigate('/student/projects/:id');
     } catch (err) {
       toast(err.message || 'Could not submit your project. Please try again.', 'error');
     } finally {

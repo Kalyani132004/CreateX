@@ -2,7 +2,6 @@ from django.db import models
 
 
 class Project(models.Model):
-
     # User ID from Auth Service
     owner_id = models.IntegerField()
 
@@ -21,6 +20,15 @@ class Project(models.Model):
 
     technologies = models.JSONField(
         default=list
+    )
+
+    # AI-generated scores
+    innovation = models.FloatField(
+        default=0.0
+    )
+
+    similarity = models.FloatField(
+        default=0.0
     )
 
     documentation = models.FileField(
@@ -48,13 +56,12 @@ class Project(models.Model):
 
 
 class ProjectImage(models.Model):
-
     project = models.ForeignKey(
         Project,
         on_delete=models.CASCADE,
         related_name="images"
     )
-
+    
     image = models.ImageField(
         upload_to="projects/images/"
     )

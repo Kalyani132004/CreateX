@@ -40,7 +40,7 @@ export default function App() {
 
             <Route path="/student" element={<DashboardLayout role="student" />}>
               <Route path="dashboard" element={<StudentDashboard />} />
-              <Route path="projects" element={<MyProjects />} />
+              <Route path="projects/:id" element={<MyProjects />} />
               <Route path="projects/add" element={<AddProject />} />
               <Route path="search" element={<SearchProjects />} />
               <Route path="wishlist" element={<Wishlist />} />

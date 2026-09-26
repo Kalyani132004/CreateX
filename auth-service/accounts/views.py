@@ -1,43 +1,16 @@
-
-"""
-accounts/views.py
-
-Auth endpoints, rewritten to match the actual model shape:
-
-    User (AUTH_USER_MODEL) --- unique_id, email, role, password
-      |-- OneToOne --> Student (first/last name, course, batch, ...)
-      |-- OneToOne --> Faculty (first/last name, department, ...)
-
-The important change from a flat "Student has its own unique_id/password"
-model: login/password checks now happen against `User`, and profile fields
-(course, batch, department, ...) are read from `user.profile`
-(`user.student_profile` / `user.faculty_profile`).
-
-This also lets us stop hand-parsing the JWT in StudentMeView. Because
-LoginView issues tokens with `RefreshToken.for_user(user)`, the token's
-"user_id" claim is the actual User primary key — exactly what DRF
-SimpleJWT's default JWTAuthentication expects. So protected views can just
-use `authentication_classes = [JWTAuthentication]` + `IsAuthenticated` and
-read `request.user`, instead of manually decoding the token by hand.
-"""
-
 from django.shortcuts import get_object_or_404
-
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
-
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from .models import User, Student, Faculty
+from .serializers import StudentRegisterSerializer, StudentSerializer, FacultySerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.authentication import JWTAuthentication
-
-from .models import User, Student, Faculty
-from .serializers import StudentRegisterSerializer
-
+from rest_framework.parsers import MultiPartParser, FormParser
 
 class RegisterView(APIView):
-    # Anyone can register; no token exists yet for this request.
     authentication_classes = []
     permission_classes = [AllowAny]
 
@@ -68,7 +41,6 @@ class RegisterView(APIView):
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 class LoginView(APIView):
     """
@@ -146,41 +118,6 @@ class LoginView(APIView):
             user_type: user_data,
         })
 
-
-class RefreshView(APIView):
-    """
-    POST /auth/student/refresh
-    body: { "refresh_token": "<token>" }
-    """
-    authentication_classes = []
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        refresh_token = request.data.get("refresh_token")
-
-        if not refresh_token:
-            return Response(
-                {"detail": "refresh_token is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            refresh = RefreshToken(refresh_token)
-        except TokenError:
-            return Response(
-                {"detail": "Invalid or expired refresh token."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-
-        # Custom claims (unique_id, role) set at login are copied onto the
-        # new access token automatically — SimpleJWT only drops reserved
-        # claims like exp/iat on refresh, so nothing extra to do here.
-        return Response({
-            "access_token": str(refresh.access_token),
-            "token_type": "Bearer",
-        })
-
-
 class StudentMeView(APIView):
     """
     GET /auth/student/me
@@ -194,14 +131,13 @@ class StudentMeView(APIView):
 
     def get(self, request):
         user = request.user
-
         if user.role != User.Role.STUDENT:
             return Response(
                 {"detail": "Invalid role."},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        student = get_object_or_404(Student, user=user)
+        student = get_object_or_404(Student, user=request.user)
 
         return Response({
             "id": student.id,
@@ -213,9 +149,8 @@ class StudentMeView(APIView):
             "course": student.course,
             "batch_start": student.batch_start,
             "batch_end": student.batch_end,
-            "role": "student",
+            "role": "student"
         })
-
 
 class HealthView(APIView):
     authentication_classes = []
@@ -227,3 +162,432 @@ class HealthView(APIView):
             "status": "running",
             "port": 8001
         })
+
+class ProfileView(APIView):
+    """
+    Profile API for authenticated students and faculty.
+
+    GET:
+        Returns the complete profile of the logged-in user.
+
+    PATCH:
+        Updates the logged-in user's profile.
+
+    Supports:
+        - JSON/form data
+        - multipart/form-data
+        - profile photo upload
+    """
+
+    authentication_classes = [JWTAuthentication]
+
+    permission_classes = [IsAuthenticated]
+
+    parser_classes = [
+        MultiPartParser,
+        FormParser,
+    ]
+    #get profile
+    def get(self, request, user_type):
+        """
+        Return the authenticated user's profile.
+        """
+
+        #validate user type
+        if user_type not in ( User.Role.STUDENT, User.Role.FACULTY):
+            return Response(
+                {
+                    "detail": "Invalid user type."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
+        # Make sure the authenticated user owns this role
+        if request.user.role != user_type:
+            return Response(
+                {
+                    "detail": (
+                        "You are not authorized to "
+                        "access this profile."
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+
+        # STUDENT PROFILE
+        if user_type == User.Role.STUDENT:
+
+            student = get_object_or_404(
+                Student.objects.select_related("user"),
+                user=request.user,
+            )
+
+            profile = {
+                # Identity
+                "first_name": student.first_name,
+
+                "middle_name": student.middle_name,
+
+                "last_name": student.last_name,
+
+                "full_name": student.full_name,
+
+                "email": student.user.email,
+
+                "college_id": student.user.unique_id,
+
+                "role": student.user.role,
+
+                # Academic
+                "course": student.course,
+
+                "batch_start": student.batch_start,
+
+                "batch_end": student.batch_end,
+
+                "batch": student.batch,
+
+                # Skills
+                "skills": student.skills or [],
+
+                # Profile
+                "bio": student.bio or "",
+
+                # Social links
+                "github_url": student.github_url or "",
+
+                "linkedin_url": student.linkedin_url or "",
+
+                "leetcode_url": student.leetcode_url or "",
+
+                "gfg_url": student.gfg_url or "",
+
+                # Profile photo
+                "profile_photo": (
+                    request.build_absolute_uri(
+                        student.profile_photo.url
+                    )
+                    if student.profile_photo
+                    else ""
+                ),
+            }
+
+            return Response(
+                {
+                    "profile": profile
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # FACULTY PROFILE
+        faculty = get_object_or_404(
+            Faculty.objects.select_related("user"),
+            user=request.user,
+        )
+
+        profile = {
+            # Identity
+            "first_name": faculty.first_name,
+
+            "last_name": faculty.last_name,
+
+            "full_name": faculty.full_name,
+
+            "email": faculty.user.email,
+
+            "staff_id": faculty.user.unique_id,
+
+            "role": faculty.user.role,
+
+            # Faculty information
+            "department": faculty.department or "",
+
+            "bio": faculty.bio or "",
+
+            # Profile photo
+            "profile_photo": (
+                request.build_absolute_uri(
+                    faculty.profile_photo.url
+                )
+                if faculty.profile_photo
+                else ""
+            ),
+        }
+
+        return Response(
+            {
+                "profile": profile
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    # PATCH PROFILE
+    def patch(self, request, user_type):
+        """
+        Update the authenticated user's profile.
+        """
+
+        # Validate user type
+
+        if user_type not in (
+            User.Role.STUDENT,
+            User.Role.FACULTY,
+        ):
+            return Response(
+                {
+                    "detail": "Invalid user type."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Authorization
+        if request.user.role != user_type:
+            return Response(
+                {
+                    "detail": (
+                        "You are not authorized to "
+                        "update this profile."
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # STUDENT
+        if user_type == User.Role.STUDENT:
+
+            student = get_object_or_404(
+                Student.objects.select_related("user"),
+                user=request.user,
+            )
+
+            serializer = StudentSerializer(
+                student,
+                data=request.data,
+                partial=True,
+            )
+
+        # FACULTY
+        else:
+
+            faculty = get_object_or_404(
+                Faculty.objects.select_related("user"),
+                user=request.user,
+            )
+
+            serializer = FacultySerializer(
+                faculty,
+                data=request.data,
+                partial=True,
+            )
+
+        # Validate
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "detail": "Invalid form details.",
+                    "errors": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
+
+        # Save
+        instance = serializer.save()
+        print("========== PHOTO DEBUG ==========")
+        print("CONTENT TYPE:", request.content_type)
+        print("REQUEST DATA:", request.data)
+        print("REQUEST FILES:", request.FILES)
+        print("PROFILE PHOTO:", request.FILES.get("profile_photo"))
+        print("=================================")
+        print("SAVED PHOTO:", instance.profile_photo)
+        print("PHOTO NAME:", instance.profile_photo.name if instance.profile_photo else None)
+        print("PHOTO URL:", instance.profile_photo.url if instance.profile_photo else None)
+
+        # UPDATED STUDENT PROFILE
+        if user_type == User.Role.STUDENT:
+
+            student = instance
+
+            profile = {
+                "first_name": student.first_name,
+
+                "middle_name": student.middle_name,
+
+                "last_name": student.last_name,
+
+                "full_name": student.full_name,
+
+                "email": student.user.email,
+
+                "college_id": student.user.unique_id,
+
+                "role": student.user.role,
+
+                "course": student.course,
+
+                "batch_start": student.batch_start,
+
+                "batch_end": student.batch_end,
+
+                "batch": student.batch,
+
+                "skills": student.skills or [],
+
+                "bio": student.bio or "",
+
+                "github_url": student.github_url or "",
+
+                "linkedin_url": student.linkedin_url or "",
+
+                "leetcode_url": student.leetcode_url or "",
+
+                "gfg_url": student.gfg_url or "",
+
+                "profile_photo": (
+                    request.build_absolute_uri(
+                        student.profile_photo.url
+                    )
+                    if student.profile_photo
+                    else ""
+                ),
+            }
+
+        # UPDATED FACULTY PROFILE
+        else:
+
+            faculty = instance
+
+            profile = {
+                "first_name": faculty.first_name,
+
+                "last_name": faculty.last_name,
+
+                "full_name": faculty.full_name,
+
+                "email": faculty.user.email,
+
+                "staff_id": faculty.user.unique_id,
+
+                "role": faculty.user.role,
+
+                "department": faculty.department or "",
+
+                "bio": faculty.bio or "",
+
+                "profile_photo": (
+                    request.build_absolute_uri(
+                        faculty.profile_photo.url
+                    )
+                    if faculty.profile_photo
+                    else ""
+                ),
+            }
+
+        # FINAL RESPONSE
+        return Response(
+            {
+                "detail": "Profile updated successfully.",
+                "profile": profile,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class ChangePasswordView(APIView):
+    def post(self, request, user_type):
+        if user_type not in (User.Role.FACULTY, User.Role.STUDENT):
+            return Response(
+                {'details':'Invalid type'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if user_type != request.user.role:
+            return Response(
+                {'details':'Invalid type'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        #retrieve pyload
+        current_password = request.data.get('current_password')
+        new_password = request.data.get('new_password')
+        #ensure both fields are provided
+        if not current_password or not new_password:
+            return Response(
+                {"error": "Both current_password and new_password are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        user = request.user
+        #check the existing password
+        if not user.check_password(current_password):
+            return Response({'details':"Invalid current password please try again."},status=status.HTTP_400_BAD_REQUEST)
+
+        # same password does not allow
+        if current_password == new_password:
+            return Response(
+                {"details": "New password cannot be the same as the current password."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        #set the new password
+        user.set_password(new_password)
+        user.save()
+        return Response({'details':"Password update successfully."},status=status.HTTP_200_OK)
+
+class StudentRefreshTokenView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request, user_type):
+        if user_type not in (User.Role.STUDENT, User.Role.FACULTY):
+            return Response(
+                {"detail": "Invalid user type."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        refresh_token = request.data.get("refresh_token")
+
+        if not refresh_token:
+            return Response(
+                {"detail": "Refresh token is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            refresh = RefreshToken(refresh_token)
+
+            return Response(
+                {
+                    "access_token": str(refresh.access_token),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except TokenError:
+            return Response(
+                {"detail": "Invalid or expired refresh token."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+#for current user projects
+class StudentInternalLookupView(APIView):
+
+    def get(self, request, student_id):
+        try:
+            student = Student.objects.select_related("user").get(
+                id=student_id
+            )
+
+            return Response({
+                "id": student.id,
+                "full_name": student.full_name,
+                "course": student.course,
+                "batch_start": student.batch_start,
+                "batch_end": student.batch_end,
+            })
+
+        except Student.DoesNotExist:
+            return Response(
+                {"detail": "Student not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )

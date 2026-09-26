@@ -18,7 +18,8 @@ class ProjectListCreateView(APIView):
 
         serializer = ProjectSerializer(
             projects,
-            many=True
+            many=True,
+            context={"request": request}
         )
 
         return Response(serializer.data)
@@ -31,6 +32,8 @@ class ProjectListCreateView(APIView):
                 {"detail": "Authentication required."},
                 status=status.HTTP_401_UNAUTHORIZED
             )
+
+        print(request.data.get("technologies"))
 
         # Project data
         serializer = ProjectSerializer(
@@ -55,7 +58,10 @@ class ProjectListCreateView(APIView):
                 )
 
             return Response(
-                ProjectSerializer(project).data,
+                ProjectSerializer(
+                    project,
+                    context={"request": request}
+                ).data,
                 status=status.HTTP_201_CREATED
             )
 
@@ -83,7 +89,10 @@ class ProjectDetailView(APIView):
 
         project = self.get_project(pk)
 
-        serializer = ProjectSerializer(project)
+        serializer = ProjectSerializer(
+            project,
+            context={"request": request}
+        )
 
         return Response(serializer.data)
 
@@ -111,7 +120,10 @@ class ProjectDetailView(APIView):
             project = serializer.save()
 
             return Response(
-                ProjectSerializer(project).data
+                ProjectSerializer(
+                    project,
+                    context={"request": request}
+                ).data
             )
 
         return Response(
@@ -154,7 +166,8 @@ class MyProjectsView(APIView):
 
         serializer = ProjectSerializer(
             projects,
-            many=True
+            many=True,
+            context={"request": request}
         )
-
+        
         return Response(serializer.data)

@@ -1,23 +1,11 @@
 
-"""
-accounts/serializers.py
-
-StudentRegisterSerializer creates BOTH rows needed for a student account:
-  1. User    (unique_id, email, password, role="student")
-  2. Student (first/last name, course, batch, ... — linked via OneToOne)
-
-RegisterView (see views.py) calls `.save()` and expects back the `Student`
-instance, then reads `student.user.email` / `student.user.unique_id` off it.
-"""
-
 import re
-
 from django.db import transaction
 from rest_framework import serializers
 
-from .models import User, Student
+from .models import Faculty, User, Student
 
-
+#student registration serializer
 class StudentRegisterSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=80)
     middle_name = serializers.CharField(max_length=80, required=False, allow_blank=True)
@@ -102,3 +90,22 @@ class StudentRegisterSerializer(serializers.Serializer):
     def save(self, **kwargs):
         # Student instance RegisterView expects.
         return self.create(self.validated_data)
+
+#student serializer
+class StudentSerializer(serializers.ModelSerializer):
+    profile_photo = serializers.ImageField(
+        required=False,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = Student
+        fields = ['bio','gfg_url','github_url','linkedin_url','leetcode_url','profile_photo']
+
+#faculty serializer
+class FacultySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Faculty
+        fields = [
+            "bio"
+        ]

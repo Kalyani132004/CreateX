@@ -4,7 +4,7 @@ import { Avatar } from '../Badge/Badge';
 
 export const STUDENT_NAV = [
   { to: '/student/dashboard', icon: 'bi-grid-1x2-fill', label: 'Dashboard' },
-  { to: '/student/projects', icon: 'bi-folder2-open', label: 'My Projects' },
+  { to: '/student/projects/:id', icon: 'bi-folder2-open', label: 'My Projects' },
   { to: '/student/projects/add', icon: 'bi-plus-circle', label: 'Add Project' },
   { to: '/student/search', icon: 'bi-search', label: 'Search Projects' },
   { to: '/student/wishlist', icon: 'bi-heart', label: 'Wishlist' },

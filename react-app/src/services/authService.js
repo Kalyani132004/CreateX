@@ -1,8 +1,7 @@
-
 import api from './api';
 
 export const authService = {
-    //student login url
+  //student login url
   studentLogin: (uniqueId, password) =>
     api.post('/auth/student/login/', { unique_id: uniqueId, password }),
   //faculty login url
@@ -16,7 +15,8 @@ export const authService = {
   //logout url
   logout: () => api.post('/auth/logout/'),
   //password reset url
-  changePassword: (payload) => api.post('/auth/change-password/', payload),
+  changePassword: (payload) =>
+    api.post(`/auth/${payload.user_type}/change-password/`, payload),
   //refresh url
   me: () => api.get('/auth/me/'),
 };

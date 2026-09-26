@@ -1,6 +1,7 @@
 
 # CreateX - Microservices .gitignore
-
+.postman/
+postman/
 # ---------- Python ----------
 __pycache__/
 *.py[cod]

@@ -1,4 +1,3 @@
-
 from django.urls import path
 
 from .views import (
@@ -6,34 +5,56 @@ from .views import (
     LoginView,
     HealthView,
     StudentMeView,
-    RefreshView
+    ProfileView,
+    StudentRefreshTokenView,
+    ChangePasswordView,
+    StudentInternalLookupView
 )
 
-
 urlpatterns = [
-
     path(
-        "student/register",
+        "student/register/",
         RegisterView.as_view(),
-        name="register"
+        name="student-register",
     ),
 
     path(
-        "<str:user_type>/login",
+        "<str:user_type>/login/",
         LoginView.as_view(),
         name="login",
     ),
 
-     path(
-        "me/",
-        StudentMeView.as_view(),
-        name="student-me"
+    path(
+        "<str:user_type>/refresh/",
+        StudentRefreshTokenView.as_view(),
+        name="refresh",
+    ),
+    path(
+        "<str:user_type>/change-password/",
+        ChangePasswordView.as_view(),
+        name="change-password",
     ),
 
     path(
-        "health",
-        HealthView.as_view(),
-        name="health"
+        "<str:user_type>/profile/",
+        ProfileView.as_view(),
+        name="profile",
     ),
-    path("student/refresh", RefreshView.as_view(), name="refresh"),
+
+    path(
+        "me/",
+        StudentMeView.as_view(),
+        name="student-me",
+    ),
+
+    path(
+        "health/",
+        HealthView.as_view(),
+        name="health",
+    ),
+    path(
+        "internal/students/<int:student_id>/",
+        StudentInternalLookupView.as_view(),
+        name="student-internal-lookup",
+    ),
 ]
