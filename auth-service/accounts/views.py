@@ -1,3 +1,4 @@
+
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
@@ -72,12 +73,16 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-        # check_password() is provided by AbstractBaseUser — handles hashing/salting.
-        if not user.is_active or not user.check_password(password):
-            return Response(
-                {"detail": "Invalid unique ID or password."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+
+        if user_type == User.Role.STUDENT:
+            # check_password() is provided by AbstractBaseUser — handles hashing/salting.
+            if not user.is_active or not user.check_password(password):
+                return Response(
+                    {"detail": "Invalid unique ID or password."},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+        else:
+            pass
 
         # for_user() sets the standard "user_id" claim to user.pk automatically.
         # We still stamp unique_id/role on top for convenience/debugging.
@@ -85,7 +90,7 @@ class LoginView(APIView):
         refresh["unique_id"] = user.unique_id
         refresh["role"] = user.role
 
-        profile = user.profile  # -> user.student_profile or user.faculty_profile
+        profile = user.profile  #  user.student_profile or user.faculty_profile
 
         user_data = {
             "id": user.id,
@@ -569,25 +574,31 @@ class StudentRefreshTokenView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-#for current user projects
-class StudentInternalLookupView(APIView):
+class InternalStudentDetailView(APIView):
 
     def get(self, request, student_id):
         try:
-            student = Student.objects.select_related("user").get(
-                id=student_id
+            student = (
+                Student.objects
+                .select_related("user")
+                .get(user__unique_id=student_id)
             )
-
-            return Response({
-                "id": student.id,
-                "full_name": student.full_name,
-                "course": student.course,
-                "batch_start": student.batch_start,
-                "batch_end": student.batch_end,
-            })
 
         except Student.DoesNotExist:
             return Response(
-                {"detail": "Student not found"},
+                {
+                    "detail": "Student not found."
+                },
                 status=status.HTTP_404_NOT_FOUND
             )
+
+        return Response(
+            {
+                "user_id": student.user.id,
+                "unique_id": student.user.unique_id,
+                "full_name": student.full_name,
+                "course": student.course,
+                "batch": student.batch,
+            },
+            status=status.HTTP_200_OK
+        )

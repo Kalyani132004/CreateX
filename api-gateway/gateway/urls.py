@@ -1,6 +1,10 @@
 from django.urls import path
-from .views import AuthProxyView, MeView, ProjectProxy
-
+from .views import (
+    AuthProxyView,
+    MeView,
+    ProjectProxy,
+    ProjectFeedbackView,
+)
 
 urlpatterns = [
     path(
@@ -15,6 +19,14 @@ urlpatterns = [
         name="auth-me",
     ),
 
+    # IMPORTANT: specific route first
+    path(
+        "projects/<int:project_id>/feedback/",
+        ProjectFeedbackView.as_view(),
+        name="project-feedback",
+    ),
+
+    # Generic route after specific routes
     path(
         "projects/<path:path>/",
         ProjectProxy.as_view(),

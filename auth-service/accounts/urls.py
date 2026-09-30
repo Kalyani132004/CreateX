@@ -8,10 +8,15 @@ from .views import (
     ProfileView,
     StudentRefreshTokenView,
     ChangePasswordView,
-    StudentInternalLookupView
+    InternalStudentDetailView
 )
 
 urlpatterns = [
+    path(
+        "internal/students/<str:student_id>/",
+        InternalStudentDetailView.as_view(),
+        name="student-internal-lookup",
+    ),
     path(
         "student/register/",
         RegisterView.as_view(),
@@ -46,15 +51,9 @@ urlpatterns = [
         StudentMeView.as_view(),
         name="student-me",
     ),
-
     path(
         "health/",
         HealthView.as_view(),
         name="health",
-    ),
-    path(
-        "internal/students/<int:student_id>/",
-        StudentInternalLookupView.as_view(),
-        name="student-internal-lookup",
-    ),
+    )
 ]

@@ -13,9 +13,9 @@ export const projectService = {
   myProjects: () => api.get('/projects/mine/'),
 
   wishlist: {
-    list: () => api.get('/wishlist/'),
-    add: (projectId) => api.post('/wishlist/', { project: projectId }),
-    remove: (projectId) => api.delete(`/wishlist/${projectId}/`),
+    list: () => api.get('/projects/wishlist/'),
+    add: (projectId) => api.post('/projects/wishlist/', { project: projectId }),
+    remove: (projectId) => api.delete(`/projects/wishlist/${projectId}/`),
   },
 
   feedback: {

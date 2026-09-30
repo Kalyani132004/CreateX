@@ -9,8 +9,6 @@ https://docs.djangoproject.com/en/6.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
-AUTH_SERVICE_URL = "http://127.0.0.1:8001"
-PROJECTS_SERVICE_URL = "http://127.0.0.1:8002"
 from pathlib import Path
 from datetime import timedelta
 
@@ -40,7 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
      'rest_framework',
     'rest_framework_simplejwt',
-
+    'feedback',
     'projects',
 ]
 
@@ -84,7 +82,7 @@ DATABASES = {
     }
 }
 
-
+AUTH_SERVICE_URL = "http://127.0.0.1:8001"
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
 

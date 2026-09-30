@@ -92,7 +92,7 @@ export default function Register() {
     }
     setSubmitting(true);
     try {
-      await authService.register(payload={
+      await authService.register({
         first_name: form.firstName,
         middle_name: form.middleName,
         last_name: form.lastName,
@@ -104,6 +104,7 @@ export default function Register() {
         password: form.password,
         confirm_password:form.confirmPassword
       });
+      console.log('ok');
       await loginStudent(form.uid.toUpperCase(), form.password);
       toast('Account created! Welcome to CreateX.');
       navigate('/student/dashboard');

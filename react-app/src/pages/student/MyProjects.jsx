@@ -1,7 +1,73 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import ProjectCard from '../../components/ProjectCard/ProjectCard';
+// import React, { useEffect, useState } from 'react';
+// import { Link } from 'react-router-dom';
+// import ProjectCard from '../../components/ProjectCard/ProjectCard';
+// import { SkeletonGrid } from '../../components/EmptyState/EmptyState';
+// import { useToast } from '../../context/ToastContext';
+// import { projectService } from '../../services/projectService';
+
+// export default function MyProjects() {
+//   const [loading, setLoading] = useState(true);
+//   const [projects, setProjects] = useState([]);
+//   const { toast } = useToast();
+
+//   useEffect(() => {
+//     let cancelled = false;
+
+//     async function load() {
+//       setLoading(true);
+//       try {
+//         const res = await projectService.myProjects();
+//         if (!cancelled) setProjects(res.data.results ?? res.data);
+//       } catch (err) {
+//         if (!cancelled) toast(err.message || 'Could not load your projects right now.', 'error');
+//       } finally {
+//         if (!cancelled) setLoading(false);
+//       }
+//     }
+
+//     load();
+//     return () => { cancelled = true; };
+//   }, [toast]);
+
+//   return (
+//     <>
+//       <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+//         <div>
+//           <h1 className="cx-h1 mb-1">My Projects</h1>
+//           <p className="cx-body mb-0">
+//             {loading ? 'Loading…' : `${projects.length} project${projects.length !== 1 ? 's' : ''} submitted`}
+//           </p>
+//         </div>
+//         <Link to="/student/projects/add" className="cx-btn cx-btn-primary">
+//           <i className="bi bi-plus-lg"></i>Add Project
+//         </Link>
+//       </div>
+
+//       {loading ? (
+//         <SkeletonGrid count={6} cols="col-sm-6 col-xl-4" />
+//       ) : projects.length ? (
+//         <div className="row g-3">
+//           {projects.map((p) => (
+//             <div className="col-sm-6 col-xl-4" key={p.id}>
+//               <ProjectCard project={p} hideWishlist />
+//             </div>
+//           ))}
+//         </div>
+//       ) : (
+//         <div className="cx-empty">
+//           <div className="cx-empty-icon"><i className="bi bi-folder2-open"></i></div>
+//           <h3 className="cx-h3">You haven't submitted any projects yet</h3>
+//           <p className="cx-small mb-3">Share your work with the CreateX community and get an instant Innovation Score.</p>
+//           <Link to="/student/projects/add" className="cx-btn cx-btn-primary">Add Your First Project</Link>
+//         </div>
+//       )}
+//     </>
+//   );
+// }
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { SkeletonGrid } from '../../components/EmptyState/EmptyState';
+import ProjectCard from '../../components/ProjectCard/ProjectCard';
 import { useToast } from '../../context/ToastContext';
 import { projectService } from '../../services/projectService';
 
@@ -9,37 +75,82 @@ export default function MyProjects() {
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       setLoading(true);
+
       try {
         const res = await projectService.myProjects();
-        if (!cancelled) setProjects(res.data.results ?? res.data);
+
+        if (!cancelled) {
+          setProjects(res.data.results ?? res.data);
+        }
       } catch (err) {
-        if (!cancelled) toast(err.message || 'Could not load your projects right now.', 'error');
+        if (!cancelled) {
+          toast(err.message || 'Could not load your projects right now.', 'error');
+        }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
     load();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, [toast]);
+
+  // Edit project
+  const handleEdit = (projectId) => {
+    navigate(`/student/projects/edit/${projectId}`);
+  };
+  const handleDelete = async (projectId) => {
+    const project = projects.find((p) => p.id === projectId);
+
+    if (!project) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${project.title}"?\n\nThis action cannot be undone.`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await projectService.remove(projectId);
+
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+
+      toast('Project deleted successfully.', 'success');
+    } catch (err) {
+      toast(err.message || 'Could not delete the project.', 'error');
+    }
+  };
 
   return (
     <>
       <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
         <div>
           <h1 className="cx-h1 mb-1">My Projects</h1>
+
           <p className="cx-body mb-0">
-            {loading ? 'Loading…' : `${projects.length} project${projects.length !== 1 ? 's' : ''} submitted`}
+            {loading
+              ? 'Loading…'
+              : `${projects.length} project${
+                  projects.length !== 1 ? 's' : ''
+                } submitted`}
           </p>
         </div>
+
         <Link to="/student/projects/add" className="cx-btn cx-btn-primary">
-          <i className="bi bi-plus-lg"></i>Add Project
+          <i className="bi bi-plus-lg"></i>
+          Add Project
         </Link>
       </div>
 
@@ -49,16 +160,33 @@ export default function MyProjects() {
         <div className="row g-3">
           {projects.map((p) => (
             <div className="col-sm-6 col-xl-4" key={p.id}>
-              <ProjectCard project={p} hideWishlist />
+              <ProjectCard
+                project={p}
+                hideWishlist
+                showEdit
+                onEdit={() => handleEdit(p.id)}
+                showDelete
+                onDelete={handleDelete}
+              />
             </div>
           ))}
         </div>
       ) : (
         <div className="cx-empty">
-          <div className="cx-empty-icon"><i className="bi bi-folder2-open"></i></div>
+          <div className="cx-empty-icon">
+            <i className="bi bi-folder2-open"></i>
+          </div>
+
           <h3 className="cx-h3">You haven't submitted any projects yet</h3>
-          <p className="cx-small mb-3">Share your work with the CreateX community and get an instant Innovation Score.</p>
-          <Link to="/student/projects/add" className="cx-btn cx-btn-primary">Add Your First Project</Link>
+
+          <p className="cx-small mb-3">
+            Share your work with the CreateX community and get an instant Innovation
+            Score.
+          </p>
+
+          <Link to="/student/projects/add" className="cx-btn cx-btn-primary">
+            Add Your First Project
+          </Link>
         </div>
       )}
     </>

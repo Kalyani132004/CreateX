@@ -1,28 +1,27 @@
-import requests
 
+from dataclasses import field
+
+from django.forms import fields
+import requests
 from django.conf import settings
 from rest_framework import serializers
-
-from .models import Project, ProjectImage
-
+from .models import Project, ProjectImage, Wishlist
 class ProjectImageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProjectImage
-        fields = ["id", "image"]
+        fields = [
+            "id",
+            "image",
+        ]
 
 class ProjectSerializer(serializers.ModelSerializer):
-
     images = ProjectImageSerializer(
         many=True,
         read_only=True
     )
-
-    owner_name = serializers.SerializerMethodField()
-
     class Meta:
         model = Project
-
         fields = [
             "id",
             "owner_id",
@@ -52,36 +51,24 @@ class ProjectSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+class WishlistSerializer(serializers.ModelSerializer):
 
-    def get_owner_name(self, obj):
+    project = ProjectSerializer(
+        read_only=True
+    )
 
-        url = (
-            f"{settings.AUTH_SERVICE_URL}"
-            f"/auth/internal/students/{obj.owner_id}/"
-        )
+    class Meta:
+        model = Wishlist
+        fields = [
+            "id",
+            "user_id",
+            "project",
+            "created_at",
+        ]
 
-        try:
-            request = self.context["request"]
-
-            access_token = request.headers.get("Authorization")
-
-            response = requests.get(
-                url,
-                headers={
-                    "Authorization": access_token
-                },
-                timeout=3
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-
-                return data.get(
-                    "full_name",
-                    "Unknown Student"
-                )
-
-        except requests.RequestException as e:
-            print("AUTH SERVICE ERROR:", e)
-
-        return "Unknown Student"
+        read_only_fields = [
+            "id",
+            "user_id",
+            "project",
+            "created_at",
+        ]

@@ -21,8 +21,7 @@ class StudentRegisterSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, min_length=8)
     confirm_password = serializers.CharField(write_only=True, min_length=8)
 
-    # --- field-level validation -------------------------------------------------
-
+    # field-level validation
     def validate_unique_id(self, value):
         value = value.upper().strip()
         if not re.match(r"^N\d{11}$", value):
@@ -39,7 +38,7 @@ class StudentRegisterSerializer(serializers.Serializer):
             raise serializers.ValidationError("An account with this email already exists.")
         return value
 
-    # --- cross-field validation ---------------------------------------------
+    # cross-field validation
 
     def validate(self, attrs):
         if attrs["password"] != attrs["confirm_password"]:
@@ -52,7 +51,7 @@ class StudentRegisterSerializer(serializers.Serializer):
 
         return attrs
 
-    # --- creation -------------------------------------------------------------
+    # creation
 
     def create(self, validated_data):
         validated_data.pop("confirm_password")
@@ -88,7 +87,7 @@ class StudentRegisterSerializer(serializers.Serializer):
             raise
 
     def save(self, **kwargs):
-        # Student instance RegisterView expects.
+        # Student instance RegisterView 
         return self.create(self.validated_data)
 
 #student serializer

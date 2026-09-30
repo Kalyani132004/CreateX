@@ -1,6 +1,8 @@
 import json
+import stat
+from django import views
 import requests
-
+from rest_framework.views import APIView
 from django.http import JsonResponse
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -52,14 +54,11 @@ def get_json_body(request):
     except (UnicodeDecodeError, json.JSONDecodeError):
         return None
 
-# GET MULTIPART DATA
 def get_multipart_data(request):
     if request.method == "POST":
-        # POST already gets this for free from Django.
         post_source = request.POST
         files_source = request.FILES
     else:
-        # PATCH / PUT: parse the multipart body manually.
         parser = MultiPartParser(
             request.META,
             request,
@@ -75,17 +74,24 @@ def get_multipart_data(request):
         data[key] = post_source.get(key)
 
     # Uploaded files
-    files = {}
+    files = []
 
-    for key, uploaded_file in files_source.items():
-        files[key] = (
-            uploaded_file.name,
-            uploaded_file.read(),
-            uploaded_file.content_type,
-        )
+    for key in files_source:
+        uploaded_files = files_source.getlist(key)
+
+        for uploaded_file in uploaded_files:
+            files.append(
+                (
+                    key,
+                    (
+                        uploaded_file.name,
+                        uploaded_file.read(),
+                        uploaded_file.content_type,
+                    )
+                )
+            )
 
     return data, files
-
 
 # PROXY RESPONSE
 def proxy_response(response):
@@ -270,12 +276,9 @@ class MeView(View):
 
 
 # PROJECT PROXY
-
 @method_decorator(csrf_exempt, name="dispatch")
 class ProjectProxy(View):
-
     def dispatch_request(self, request, path=""):
-
         allowed_methods = [
             "GET",
             "POST",
@@ -379,3 +382,50 @@ class ProjectProxy(View):
 
     def delete(self, request, path=""):
         return self.dispatch_request(request, path)
+
+class ProjectFeedbackView(APIView):
+
+    target_url = f"{PROJECTS_SERVICE_URL}/projects"
+
+    def get(self, request, project_id):
+        try:
+            res = requests.get(
+                f"{self.target_url}/{project_id}/feedback/",
+                headers={
+                    "Authorization": request.headers.get("Authorization", "")
+                }
+            )
+
+            return JsonResponse(
+                res.json(),
+                status=res.status_code,
+                safe=False
+            )
+
+        except requests.RequestException as e:
+            return JsonResponse(
+                {"error": str(e)},
+                status=502
+            )
+
+    def post(self, request, project_id):
+        try:
+            res = requests.post(
+                f"{self.target_url}/{project_id}/feedback/",
+                json=request.data,
+                headers={
+                    "Authorization": request.headers.get("Authorization", "")
+                }
+            )
+
+            return JsonResponse(
+                res.json(),
+                status=res.status_code,
+                safe=False
+            )
+
+        except requests.RequestException as e:
+            return JsonResponse(
+                {"error": str(e)},
+                status=502
+            )

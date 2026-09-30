@@ -7,8 +7,6 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
-
-
 # USER MANAGER
 class UserManager(BaseUserManager):
     """
@@ -17,13 +15,7 @@ class UserManager(BaseUserManager):
     Users authenticate using unique_id instead of username.
     """
 
-    def _create_user(
-        self,
-        unique_id,
-        email,
-        password,
-        **extra_fields,
-    ):
+    def _create_user(self,unique_id,email,password,**extra_fields):
         if not unique_id:
             raise ValueError(
                 "Users must have a unique_id."
@@ -47,37 +39,15 @@ class UserManager(BaseUserManager):
 
         return user
 
-    def create_user(
-        self,
-        unique_id,
-        email,
-        password=None,
-        **extra_fields,
-    ):
-        extra_fields.setdefault(
-            "is_staff",
-            False,
-        )
+    def create_user(self,unique_id,email,password=None,**extra_fields):
+        #dont make a anyone a staff so i'll be staff  is false
+        extra_fields.setdefault("is_staff", False,)
 
-        extra_fields.setdefault(
-            "is_superuser",
-            False,
-        )
+        extra_fields.setdefault("is_superuser",False)
 
-        return self._create_user(
-            unique_id,
-            email,
-            password,
-            **extra_fields,
-        )
+        return self._create_user(unique_id,email,password,**extra_fields)
 
-    def create_superuser(
-        self,
-        unique_id,
-        email,
-        password=None,
-        **extra_fields,
-    ):
+    def create_superuser(self,unique_id,email, password=None, **extra_fields):
         extra_fields.setdefault(
             "is_staff",
             True,
@@ -94,14 +64,9 @@ class UserManager(BaseUserManager):
             password,
             **extra_fields,
         )
-
-
 
 # CUSTOM USER
-class User(
-    AbstractBaseUser,
-    PermissionsMixin,
-):
+class User( AbstractBaseUser, PermissionsMixin ):
     """
     Authentication and identity model.
 
@@ -199,8 +164,6 @@ class User(
             return self.faculty_profile
 
         return None
-
-
 
 # STUDENT
 class Student(models.Model):
@@ -353,8 +316,6 @@ class Student(models.Model):
             f"{self.batch_start}-"
             f"{self.batch_end}"
         )
-
-
 
 # FACULTY
 class Faculty(models.Model):

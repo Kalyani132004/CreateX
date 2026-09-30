@@ -2,15 +2,12 @@ import { Modal } from 'bootstrap';
 import { useEffect, useState } from 'react';
 
 import { Avatar } from '../../components/Badge/Badge';
-import { SkeletonGrid } from '../../components/EmptyState/EmptyState';
-import ProjectCard from '../../components/ProjectCard/ProjectCard';
 
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 
 import api from '../../services/api';
 import { authService } from '../../services/authService';
-import { projectService } from '../../services/projectService';
 
 const SOCIAL_FIELDS = [
   {
@@ -45,14 +42,11 @@ const EMPTY_PROFILE = {
   batch_start: '',
   batch_end: '',
   skills: [],
-
   bio: '',
-
   github: '',
   linkedin: '',
   leetcode: '',
   gfg: '',
-
   profile_photo: '',
 };
 
@@ -81,8 +75,6 @@ export default function StudentProfile() {
   const [loading, setLoading] = useState(true);
 
   const [profile, setProfile] = useState(EMPTY_PROFILE);
-
-  const [projects, setProjects] = useState([]);
 
   const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
 
@@ -117,7 +109,6 @@ export default function StudentProfile() {
       return data.error;
     }
 
-    // Django/DRF field errors
     if (data && typeof data === 'object') {
       const firstFieldError = Object.values(data).find(
         (value) => Array.isArray(value) && value.length > 0,
@@ -170,18 +161,14 @@ export default function StudentProfile() {
   };
 
   // =========================================================
-  // NORMALIZE EDIT FORM
+  // PROFILE → EDIT FORM
   // =========================================================
 
   const profileToEditForm = (profileData) => ({
     bio: profileData?.bio ?? '',
-
     github: profileData?.github ?? '',
-
     linkedin: profileData?.linkedin ?? '',
-
     leetcode: profileData?.leetcode ?? '',
-
     gfg: profileData?.gfg ?? '',
   });
 
@@ -241,20 +228,16 @@ export default function StudentProfile() {
     const loadProfile = async () => {
       setLoading(true);
 
-      // =====================================================
-      // LOAD PROFILE
-      // =====================================================
-
       try {
-        const profileResponse = await api.get('/auth/student/profile/');
-
-        console.log('PROFILE API RESPONSE:', profileResponse.data);
+        const response = await api.get('/auth/student/profile/');
 
         if (cancelled) {
           return;
         }
 
-        const normalizedProfile = normalizeProfile(profileResponse.data);
+        console.log('PROFILE API RESPONSE:', response.data);
+
+        const normalizedProfile = normalizeProfile(response.data);
 
         console.log('NORMALIZED PROFILE:', normalizedProfile);
 
@@ -272,32 +255,6 @@ export default function StudentProfile() {
             'error',
           );
         }
-      }
-
-      // =====================================================
-      // LOAD PROJECTS SEPARATELY
-      // =====================================================
-
-      try {
-        const projectsResponse = await projectService.myProjects();
-
-        console.log('PROJECT API RESPONSE:', projectsResponse.data);
-
-        if (cancelled) {
-          return;
-        }
-
-        const projectData =
-          projectsResponse?.data?.results ?? projectsResponse?.data ?? [];
-
-        setProjects(Array.isArray(projectData) ? projectData : []);
-      } catch (error) {
-        console.error('Student projects API error:', error);
-
-        // Project failure should NOT hide profile information.
-        if (!cancelled) {
-          setProjects([]);
-        }
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -311,8 +268,9 @@ export default function StudentProfile() {
       cancelled = true;
     };
   }, []);
+
   // =========================================================
-  // PROFILE PHOTO
+  // PROFILE PHOTO CHANGE
   // =========================================================
 
   const handleProfilePhotoChange = (event) => {
@@ -332,7 +290,8 @@ export default function StudentProfile() {
       return;
     }
 
-    const maxSize = 5 * 1024 * 1024;
+    // 2 MB
+    const maxSize = 2 * 1024 * 1024;
 
     if (file.size > maxSize) {
       toast('Profile picture must be less than 2 MB.', 'error');
@@ -362,35 +321,67 @@ export default function StudentProfile() {
   // SAVE PROFILE
   // =========================================================
 
-  const handleSaveProfile = async () => {
+  const handleSaveProfile = async (event) => {
+    event.preventDefault();
+
+    if (savingProfile) {
+      return;
+    }
+
+    setSavingProfile(true);
+
     try {
       const formData = new FormData();
 
-      if (!profilePhoto) {
-        console.log('NO PROFILE PHOTO SELECTED');
-        return;
+      // Text fields
+      formData.append('bio', editForm.bio);
+      formData.append('github_url', editForm.github);
+      formData.append('linkedin_url', editForm.linkedin);
+      formData.append('leetcode_url', editForm.leetcode);
+      formData.append('gfg_url', editForm.gfg);
+
+      // Photo is optional
+      if (profilePhoto) {
+        formData.append('profile_photo', profilePhoto);
       }
 
-      formData.append('profile_photo', profilePhoto);
-
-      console.log('========== REACT PHOTO DEBUG ==========');
-      console.log('File:', profilePhoto);
-      console.log('Name:', profilePhoto.name);
-      console.log('Type:', profilePhoto.type);
-      console.log('Size:', profilePhoto.size);
+      console.log('========== PROFILE UPDATE ==========');
 
       for (const [key, value] of formData.entries()) {
-        console.log('FORM DATA:', key, value, value instanceof File ? value.name : '');
+        console.log(key, value instanceof File ? value.name : value);
       }
 
-      console.log('Is FormData:', formData instanceof FormData);
-      console.log('=======================================');
+      console.log('====================================');
 
       const response = await api.patch('/auth/student/profile/', formData);
 
-      console.log('PHOTO UPDATE RESPONSE:', response.data);
+      console.log('PROFILE UPDATE RESPONSE:', response.data);
+
+      // Normalize updated response
+      const updatedProfile = normalizeProfile(response.data);
+
+      setProfile(updatedProfile);
+
+      setEditForm(profileToEditForm(updatedProfile));
+
+      updateAuthUser(updatedProfile);
+
+      setProfilePhoto(null);
+
+      // Close modal
+      const modalElement = document.getElementById('editProfileModal');
+
+      if (modalElement) {
+        Modal.getOrCreateInstance(modalElement).hide();
+      }
+
+      toast('Profile updated successfully!', 'success');
     } catch (error) {
-      console.error('PHOTO UPDATE ERROR:', error);
+      console.error('PROFILE UPDATE ERROR:', error);
+
+      toast(getErrorMessage(error, 'Could not update your profile.'), 'error');
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -447,9 +438,7 @@ export default function StudentProfile() {
     try {
       const response = await authService.changePassword({
         user_type: user?.role || 'student',
-
         current_password: currentPassword,
-
         new_password: newPassword,
       });
 
@@ -465,6 +454,7 @@ export default function StudentProfile() {
         response?.data?.detail ||
           response?.data?.message ||
           'Password updated successfully!',
+        'success',
       );
     } catch (error) {
       console.error('Change password error:', error);
@@ -491,6 +481,22 @@ export default function StudentProfile() {
   // =========================================================
 
   const avatarName = profile.first_name || displayName || 'Student';
+
+  // =========================================================
+  // LOADING
+  // =========================================================
+
+  if (loading) {
+    return (
+      <div className="cx-card p-5 text-center">
+        <div className="spinner-border" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+
+        <p className="cx-small mt-3 mb-0">Loading your profile...</p>
+      </div>
+    );
+  }
 
   // =========================================================
   // UI
@@ -548,6 +554,7 @@ export default function StudentProfile() {
               data-bs-toggle="modal"
               data-bs-target="#editProfileModal"
             >
+              <i className="bi bi-pencil me-1"></i>
               Edit Profile
             </button>
 
@@ -557,6 +564,7 @@ export default function StudentProfile() {
               data-bs-toggle="modal"
               data-bs-target="#changePwdModal"
             >
+              <i className="bi bi-key me-1"></i>
               Change Password
             </button>
           </div>
@@ -564,42 +572,16 @@ export default function StudentProfile() {
       </div>
 
       {/* =====================================================
-          CONTENT
+          PROFILE CONTENT
       ===================================================== */}
 
       <div className="row g-4">
         {/* ===================================================
-            PROJECTS
+            SKILLS
         =================================================== */}
 
-        <div className="col-lg-8">
-          <div className="cx-card p-4 mb-4">
-            <h3 className="cx-h3 mb-3">Projects ({loading ? '…' : projects.length})</h3>
-
-            {loading ? (
-              <SkeletonGrid count={2} cols="col-sm-6" />
-            ) : projects.length > 0 ? (
-              <div className="row g-3">
-                {projects.map((project) => (
-                  <div className="col-sm-6" key={project.id || project._id}>
-                    <ProjectCard project={project} hideWishlist />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="cx-small mb-0">No projects submitted yet.</p>
-            )}
-          </div>
-        </div>
-
-        {/* ===================================================
-            SIDEBAR
-        =================================================== */}
-
-        <div className="col-lg-4">
-          {/* SKILLS */}
-
-          <div className="cx-card p-4 mb-3">
+        <div className="col-lg-6">
+          <div className="cx-card p-4 h-100">
             <h3 className="cx-h3 mb-3">Skills</h3>
 
             <div className="cx-tech-row">
@@ -614,10 +596,14 @@ export default function StudentProfile() {
               )}
             </div>
           </div>
+        </div>
 
-          {/* SOCIAL LINKS */}
+        {/* ===================================================
+            SOCIAL LINKS
+        =================================================== */}
 
-          <div className="cx-card p-4">
+        <div className="col-lg-6">
+          <div className="cx-card p-4 h-100">
             <h3 className="cx-h3 mb-3">Social Links</h3>
 
             {SOCIAL_FIELDS.map(({ key, icon, label }) => {
@@ -864,6 +850,8 @@ export default function StudentProfile() {
               </div>
 
               <div className="modal-body">
+                {/* CURRENT PASSWORD */}
+
                 <div className="cx-field">
                   <label htmlFor="current">Current Password</label>
 
@@ -877,6 +865,8 @@ export default function StudentProfile() {
                     required
                   />
                 </div>
+
+                {/* NEW PASSWORD */}
 
                 <div className="cx-field">
                   <label htmlFor="next">New Password</label>
@@ -894,6 +884,8 @@ export default function StudentProfile() {
 
                   <small className="cx-small">Minimum 8 characters.</small>
                 </div>
+
+                {/* CONFIRM PASSWORD */}
 
                 <div className="cx-field mb-0">
                   <label htmlFor="confirm">Confirm New Password</label>
