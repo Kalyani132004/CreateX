@@ -145,3 +145,4 @@ SIMPLE_JWT = {
 }
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+ML_SERVICE_URL = "http://127.0.0.1:8003"

@@ -17,6 +17,14 @@ export const authService = {
   //password reset url
   changePassword: (payload) =>
     api.post(`/auth/${payload.user_type}/change-password/`, payload),
+  resetPassword: (payload) => api.post('/auth/reset-password/', payload),
+  //forgot api
+  forgotPassword: (email) => api.post('/auth/forgot-password/', { email }),
+
   //refresh url
   me: () => api.get('/auth/me/'),
+
+  //faculty dashboard data
+  facultyDashboard: () =>
+    api.get('/faculty/dashboard-stats/')
 };

@@ -4,7 +4,9 @@ from .views import (
     ProjectListCreateView,
     ProjectDetailView,
     MyProjectsView,
-    WishlistCreateListView
+    WishlistCreateListView,
+    FacultyStatsView,
+    StudentStatsView
 )
 
 urlpatterns = [
@@ -34,5 +36,16 @@ urlpatterns = [
         "<int:pk>/",
         ProjectDetailView.as_view(),
         name="project-detail"
+    ),
+    
+    path(
+        "faculty-stats/",
+        FacultyStatsView.as_view(),
+        name="faculty-stats"
+    ),
+        path(
+        "student-stats/",
+        StudentStatsView.as_view(),
+        name="student-stats"
     ),
 ]

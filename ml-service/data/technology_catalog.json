@@ -1,0 +1,10 @@
+{
+  "Web Development": ["React", "Django", "Node.js", "PostgreSQL", "Docker", "Redis", "TypeScript", "GraphQL"],
+  "Mobile Application": ["Flutter", "React Native", "Kotlin", "Firebase", "SQLite", "Swift"],
+  "Data Science": ["Python", "Pandas", "scikit-learn", "Jupyter", "Power BI", "Apache Spark", "Matplotlib"],
+  "AI / ML": ["TensorFlow", "PyTorch", "scikit-learn", "OpenCV", "Hugging Face", "FastAPI", "MLflow"],
+  "Cyber Security": ["Wireshark", "Metasploit", "Snort", "Burp Suite", "OpenSSL", "Python"],
+  "IoT": ["Arduino", "Raspberry Pi", "MQTT", "ESP32", "Node-RED", "InfluxDB"],
+  "Cloud Computing": ["AWS", "Docker", "Kubernetes", "Terraform", "Azure", "Prometheus"],
+  "Software Development": ["Git", "Docker", "Jenkins", "PostgreSQL", "REST API", "JUnit"]
+}

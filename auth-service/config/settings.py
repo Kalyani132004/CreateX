@@ -151,3 +151,26 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
 }
+
+#email configuration for development
+'''
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+FRONTEND_URL = "http://localhost:5173"
+PASSWORD_RESET_TIMEOUT = 300
+DEFAULT_FROM_EMAIL = "noreply@createx.com"
+'''
+
+#email configuration for production
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+EMAIL_HOST_USER = 'kp097858@gmail.com'
+EMAIL_HOST_PASSWORD = 'uhqr lvzv asbm rhrc'
+
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+FRONTEND_URL = "http://localhost:5173"
+

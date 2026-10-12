@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Avatar } from '../../components/Badge/Badge';
 import { useToast } from '../../context/ToastContext';
 import api from '../../services/api';
+import { projectService } from '../../services/projectService';
 
 function scoreColor(v) {
   if (v == null) return 'var(--c-muted)';
@@ -27,25 +28,42 @@ export default function FacultyStudents() {
   const [students, setStudents] = useState([]);
   const { toast } = useToast();
 
-  useEffect(() => {
-    let cancelled = false;
+    useEffect(() => {
+      async function load() {
+        setLoading(true);
+        try {
+          // 1. all students from auth-service
+          const res = await api.get('/auth/student/list/');
+          const list = res.data.results ?? res.data;
 
-    async function load() {
-      setLoading(true);
-      try {
-        // Expected shape per student: { id, name, email, course, batch, project_count, avg_innovation }
-        const res = await api.get('/faculty/students/');
-        if (!cancelled) setStudents(res.data.results ?? res.data);
-      } catch (err) {
-        if (!cancelled) toast(err.message || 'Could not load students right now.', 'error');
-      } finally {
-        if (!cancelled) setLoading(false);
+          // 2. project count + avg innovation from project-service
+          let stats = [];
+          try {
+            const statsRes = await projectService.studentStats();
+            stats = statsRes.data;
+          } catch (err) {
+            console.log('Student stats error:', err);
+          }
+
+          // 3. join both lists using the student id
+          const merged = list.map((s) => {
+            const st = stats.find((x) => x.owner_id === s.id);
+            return {
+              ...s,
+              project_count: st ? st.project_count : 0,
+              avg_innovation: st ? st.avg_innovation : null,
+            };
+          });
+
+          setStudents(merged);
+        } catch (err) {
+          toast(err.message || 'Could not load students right now.', 'error');
+        }
+        setLoading(false);
       }
-    }
 
-    load();
-    return () => { cancelled = true; };
-  }, [toast]);
+      load();
+    }, []);
 
   return (
     <>

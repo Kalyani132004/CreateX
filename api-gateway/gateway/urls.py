@@ -4,15 +4,21 @@ from .views import (
     MeView,
     ProjectProxy,
     ProjectFeedbackView,
+    MLView
 )
 
 urlpatterns = [
+    #forgot passsword
+    path(
+        'auth/<str:user_type>/',
+        AuthProxyView.as_view(),
+        name='forgot-password-proxy'
+    ),
     path(
         "auth/<str:user_type>/<path:path>/",
         AuthProxyView.as_view(),
         name="auth-proxy",
     ),
-
     path(
         "auth/me/",
         MeView.as_view(),
@@ -32,10 +38,13 @@ urlpatterns = [
         ProjectProxy.as_view(),
         name="project-proxy",
     ),
-
     path(
         "projects/",
         ProjectProxy.as_view(),
         name="project-proxy-root",
     ),
+    path(
+        "ml/analyze",
+        MLView.as_view()
+    )
 ]

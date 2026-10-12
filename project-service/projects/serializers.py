@@ -1,4 +1,3 @@
-
 from dataclasses import field
 
 from django.forms import fields
@@ -20,6 +19,16 @@ class ProjectSerializer(serializers.ModelSerializer):
         many=True,
         read_only=True
     )
+
+    # originality is not saved in the database, it is 100 - similarity
+    originality = serializers.SerializerMethodField()
+
+    def get_originality(self, obj):
+        # innovation 0 and similarity 0 means the project is not scored yet
+        if obj.innovation == 0 and obj.similarity == 0:
+            return 0
+        return round(100 - obj.similarity)
+
     class Meta:
         model = Project
         fields = [
@@ -34,11 +43,12 @@ class ProjectSerializer(serializers.ModelSerializer):
             "technologies",
             "innovation",
             "similarity",
+            "originality",
             "documentation",
             "screen_recording",
             "images",
             "created_at",
-            "updated_at",
+            "updated_at"
         ]
 
         read_only_fields = [
@@ -47,6 +57,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "owner_name",
             "innovation",
             "similarity",
+            "originality",
             "images",
             "created_at",
             "updated_at",
@@ -70,5 +81,5 @@ class WishlistSerializer(serializers.ModelSerializer):
             "id",
             "user_id",
             "project",
-            "created_at",
+            "created_at"
         ]

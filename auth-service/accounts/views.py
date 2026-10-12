@@ -1,4 +1,6 @@
 
+import email
+
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
@@ -10,6 +12,7 @@ from .serializers import StudentRegisterSerializer, StudentSerializer, FacultySe
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.parsers import MultiPartParser, FormParser
+from accounts.models import User
 
 class RegisterView(APIView):
     authentication_classes = []
@@ -45,102 +48,194 @@ class RegisterView(APIView):
 
 class LoginView(APIView):
     """
-    POST /auth/<student|faculty>/login
-    body: { "unique_id": "...", "password": "..." }
+    POST /auth/<student|faculty>/login/
+
+    Request:
+    {
+        "unique_id": "N02122500051",
+        "password": "password"
+    }
     """
     authentication_classes = []
     permission_classes = [AllowAny]
-
     def post(self, request, user_type):
-
-        # user_type from the URL doubles as the User.role value — student/faculty only.
-        if user_type not in (User.Role.STUDENT, User.Role.FACULTY):
+        # Validate user type
+        if user_type not in (
+            User.Role.STUDENT,
+            User.Role.FACULTY,
+        ):
             return Response(
-                {"detail": "Invalid user type."},
-                status=status.HTTP_400_BAD_REQUEST
+                {
+                    "detail": "Invalid user type."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        unique_id = (request.data.get("unique_id") or "").upper().strip()
-        password = request.data.get("password") or ""
+        # Get credentials
+        unique_id = (
+            request.data.get("unique_id") or ""
+        ).strip().upper()
 
-        # Filter by role too, so a valid unique_id can't authenticate through
-        # the wrong endpoint even if IDs ever collided across roles.
+        password = (
+            request.data.get("password") or ""
+        )
+
+        if not unique_id or not password:
+            return Response(
+                {
+                    "detail": "Unique ID and password are required."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        #find the role specific profile
         try:
-            user = User.objects.get(unique_id=unique_id, role=user_type)
+
+            user = ( User.objects.select_related(
+                    "student_profile",
+                    "faculty_profile",
+                )
+                .get(
+                    unique_id=unique_id,
+                    role=user_type,
+                )
+            )
+
         except User.DoesNotExist:
             return Response(
-                {"detail": "Invalid unique ID or password."},
-                status=status.HTTP_401_UNAUTHORIZED
+                {
+                    "detail": "Invalid unique ID or password."
+                },
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        #Check account status
+        if not user.is_active:
+            return Response(
+                {
+                    "detail": "This account is inactive."
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        # Check password
+        if not user.check_password(password):
+            return Response(
+                {
+                    "detail": "Invalid unique ID or password."
+                },
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        #Get correct role-specific profile
+        if user.role == User.Role.STUDENT:
+            profile = getattr(
+                user,
+                "student_profile",
+                None,
+            )
+        else:
+            profile = getattr(
+                user,
+                "faculty_profile",
+                None,
             )
 
+        #Check profile exists
 
-        if user_type == User.Role.STUDENT:
-            # check_password() is provided by AbstractBaseUser — handles hashing/salting.
-            if not user.is_active or not user.check_password(password):
-                return Response(
-                    {"detail": "Invalid unique ID or password."},
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-        else:
-            pass
-
-        # for_user() sets the standard "user_id" claim to user.pk automatically.
-        # We still stamp unique_id/role on top for convenience/debugging.
+        if profile is None and user.role == user.Role.STUDENT:
+            return Response(
+                {
+                    "detail": (
+                        "User profile is missing. "
+                        "Please contact administrator."
+                    )
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        #Create JWT
         refresh = RefreshToken.for_user(user)
         refresh["unique_id"] = user.unique_id
         refresh["role"] = user.role
-
-        profile = user.profile  #  user.student_profile or user.faculty_profile
+        # Common user information
 
         user_data = {
             "id": user.id,
-            "email": user.email,
             "unique_id": user.unique_id,
+            "email": user.email,
         }
 
-        # Role-specific fields, pulled from the matching profile row.
-        if user_type == User.Role.STUDENT:
-            user_data.update({
-                "first_name": profile.first_name,
-                "middle_name": profile.middle_name,
-                "last_name": profile.last_name,
-                "course": profile.course,
-                "batch_start": profile.batch_start,
-                "batch_end": profile.batch_end,
-            })
-        else:  # faculty
-            user_data.update({
-                "first_name": profile.first_name,
-                "last_name": profile.last_name,
-                "department": profile.department,
-            })
+        # Student data
+        if user.role == User.Role.STUDENT:
+            user_data.update(
+                {
+                    "first_name": profile.first_name,
+                    "middle_name": profile.middle_name,
+                    "last_name": profile.last_name,
+                    "full_name": profile.full_name,
+                    "course": profile.course,
+                    "batch_start": profile.batch_start,
+                    "batch_end": profile.batch_end,
+                    "batch": profile.batch,
+                    "bio": profile.bio,
+                    "profile_photo": (
+                        profile.profile_photo.url
+                        if profile.profile_photo
+                        else None
+                    ),
+                    "github_url": profile.github_url,
+                    "linkedin_url": profile.linkedin_url,
+                    "leetcode_url": profile.leetcode_url,
+                    "gfg_url": profile.gfg_url,
+                    "skills": profile.skills,
+                }
+            )
 
-        return Response({
-            "access_token": str(refresh.access_token),
-            "refresh_token": str(refresh),
-            "token_type": "Bearer",
-            "role": user_type,
-            user_type: user_data,
-        })
+        #Faculty data
+        if profile and user.role == user.Role.FACULTY:
+            user_data.update(
+                {
+                    "first_name": profile.first_name,
+                    "last_name": profile.last_name,
+                    "full_name": profile.full_name,
+                    "department": profile.department,
+                    "bio": profile.bio,
+                    "profile_photo": (
+                        profile.profile_photo.url
+                        if profile.profile_photo
+                        else None
+                    ),
+                }
+            )
+
+        # Final response
+        return Response(
+            {
+                "access_token": str(
+                    refresh.access_token
+                ),
+                "refresh_token": str(refresh),
+                "token_type": "Bearer",
+                "role": user.role,
+                "user": user_data,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 class StudentMeView(APIView):
-    """
-    GET /auth/student/me
-
-    Standard JWT auth works here (unlike before) because LoginView now
-    issues tokens via RefreshToken.for_user(), whose "user_id" claim is
-    this User's primary key — DRF resolves request.user for us.
-    """
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-
     def get(self, request):
         user = request.user
-        if user.role != User.Role.STUDENT:
-            return Response(
-                {"detail": "Invalid role."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+
+        # Faculty pan reload var /auth/me/ call karto
+        if user.role == User.Role.FACULTY:
+            faculty = get_object_or_404(Faculty, user=user)
+
+            return Response({
+                "id": user.id,
+                "first_name": faculty.first_name,
+                "last_name": faculty.last_name,
+                "full_name": faculty.full_name,
+                "email": user.email,
+                "unique_id": user.unique_id,
+                "department": faculty.department,
+                "role": "faculty"
+            })
 
         student = get_object_or_404(Student, user=request.user)
 
@@ -156,6 +251,33 @@ class StudentMeView(APIView):
             "batch_end": student.batch_end,
             "role": "student"
         })
+        
+class StudentListView(APIView):
+    """GET /auth/student/list/  -> all students (only faculty can see)"""
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != User.Role.FACULTY:
+            return Response(
+                {"detail": "Only faculty can see the students list."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        students = Student.objects.select_related("user")
+
+        data = []
+        for s in students:
+            data.append({
+                # id is the User id, same as owner_id in project-service
+                "id": s.user.id,
+                "name": s.full_name,
+                "email": s.user.email,
+                "course": s.course,
+                "batch": s.batch,
+            })
+
+        return Response(data)
 
 class HealthView(APIView):
     authentication_classes = []
@@ -375,7 +497,6 @@ class ProfileView(APIView):
 
         # FACULTY
         else:
-
             faculty = get_object_or_404(
                 Faculty.objects.select_related("user"),
                 user=request.user,
@@ -401,15 +522,6 @@ class ProfileView(APIView):
 
         # Save
         instance = serializer.save()
-        print("========== PHOTO DEBUG ==========")
-        print("CONTENT TYPE:", request.content_type)
-        print("REQUEST DATA:", request.data)
-        print("REQUEST FILES:", request.FILES)
-        print("PROFILE PHOTO:", request.FILES.get("profile_photo"))
-        print("=================================")
-        print("SAVED PHOTO:", instance.profile_photo)
-        print("PHOTO NAME:", instance.profile_photo.name if instance.profile_photo else None)
-        print("PHOTO URL:", instance.profile_photo.url if instance.profile_photo else None)
 
         # UPDATED STUDENT PROFILE
         if user_type == User.Role.STUDENT:
@@ -575,7 +687,6 @@ class StudentRefreshTokenView(APIView):
             )
 
 class InternalStudentDetailView(APIView):
-
     def get(self, request, student_id):
         try:
             student = (

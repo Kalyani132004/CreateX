@@ -1,3 +1,5 @@
+from operator import ipow
+
 from django.urls import path
 
 from .views import (
@@ -8,15 +10,31 @@ from .views import (
     ProfileView,
     StudentRefreshTokenView,
     ChangePasswordView,
-    InternalStudentDetailView
+    InternalStudentDetailView,
+    StudentListView
 )
 
+from .forgot_password  import StudentForgotPasswordView, StudentResetPasswordView
 urlpatterns = [
+    #for project identify user route
     path(
         "internal/students/<str:student_id>/",
         InternalStudentDetailView.as_view(),
         name="student-internal-lookup",
     ),
+    #forgot password route
+    path(
+        "forgot-password/",
+        StudentForgotPasswordView.as_view(),
+        name="student-forgot-password",
+    ),
+
+    path(
+        "reset-password/",
+        StudentResetPasswordView.as_view(),
+        name="student-reset-password",
+    ),
+    #student registration route
     path(
         "student/register/",
         RegisterView.as_view(),
@@ -55,5 +73,11 @@ urlpatterns = [
         "health/",
         HealthView.as_view(),
         name="health",
-    )
+    ),
+    
+    path(
+        "student/list/",
+        StudentListView.as_view(),
+        name="student-list",
+    ),
 ]

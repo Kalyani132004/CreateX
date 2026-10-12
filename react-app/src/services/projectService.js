@@ -9,6 +9,9 @@ export const projectService = {
     }),
   update: (id, formData) => api.patch(`/projects/${id}/`, formData),
   remove: (id) => api.delete(`/projects/${id}/`),
+  
+  studentStats: () => api.get('/projects/student-stats/'),
+  facultyStats: () => api.get('/projects/faculty-stats/'),
 
   myProjects: () => api.get('/projects/mine/'),
 

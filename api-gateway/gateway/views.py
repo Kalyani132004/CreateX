@@ -1,6 +1,5 @@
 import json
-import stat
-from django import views
+from traceback import print_list
 import requests
 from rest_framework.views import APIView
 from django.http import JsonResponse
@@ -8,10 +7,13 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.http.multipartparser import MultiPartParser
+from rest_framework.response import Response
+from rest_framework import status
 
 # SERVICE URLS
 AUTH_SERVICE_URL = "http://127.0.0.1:8001"
 PROJECTS_SERVICE_URL = "http://127.0.0.1:8002"
+ML_SERVICE_URL = 'http://127.0.0.1:8003'
 
 # HEADERS THAT MUST NOT BE FORWARDED
 _EXCLUDED_REQUEST_HEADERS = {
@@ -37,18 +39,14 @@ def is_multipart_request(request):
     content_type = request.META.get("CONTENT_TYPE", "")
     return content_type.lower().startswith("multipart/form-data")
 
-
 # GET JSON BODY
 def get_json_body(request):
     if not request.body:
         return None
-
     content_type = request.META.get("CONTENT_TYPE", "")
-
     # Never decode multipart as JSON
     if content_type.lower().startswith("multipart/form-data"):
         return None
-
     try:
         return json.loads(request.body.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError):
@@ -108,14 +106,14 @@ def proxy_response(response):
         safe=isinstance(data, dict),
     )
 
-
 # AUTH PROXY
 @method_decorator(csrf_exempt, name="dispatch")
 class AuthProxyView(View):
-
     def dispatch_request(self, request, user_type, path=""):
+        print('user: ',user_type)
+
         # Validate user type
-        if user_type not in ["student", "faculty"]:
+        if user_type not in ["me","student", "faculty","forgot-password","reset-password"]:
             return JsonResponse(
                 {"detail": "Invalid user type."},
                 status=400,
@@ -131,10 +129,7 @@ class AuthProxyView(View):
         ]
 
         if request.method not in allowed_methods:
-            return JsonResponse(
-                {"detail": "Method not allowed."},
-                status=405,
-            )
+            return JsonResponse({"detail": "Method not allowed."}, status=405)
 
         # Build target URL
         path = path.strip("/")
@@ -222,24 +217,18 @@ class AuthProxyView(View):
 
     def delete(self, request, user_type, path=""):
         return self.dispatch_request(request, user_type, path)
-
-
 # CURRENT USER
-@method_decorator(csrf_exempt, name="dispatch")
 class MeView(View):
     """
     Gateway endpoint for the currently authenticated user.
-
     Frontend:
         GET /api/auth/me/
-
     Gateway forwards to:
         GET http://127.0.0.1:8001/auth/me/
     """
 
     def get(self, request):
         forwarded_headers = get_forwarded_headers(request)
-
         try:
             response = requests.get(
                 url=f"{AUTH_SERVICE_URL}/auth/me/",
@@ -271,9 +260,7 @@ class MeView(View):
                 {"detail": f"Auth Service request failed: {exc}"},
                 status=502,
             )
-
         return proxy_response(response)
-
 
 # PROJECT PROXY
 @method_decorator(csrf_exempt, name="dispatch")
@@ -384,9 +371,7 @@ class ProjectProxy(View):
         return self.dispatch_request(request, path)
 
 class ProjectFeedbackView(APIView):
-
     target_url = f"{PROJECTS_SERVICE_URL}/projects"
-
     def get(self, request, project_id):
         try:
             res = requests.get(
@@ -429,3 +414,19 @@ class ProjectFeedbackView(APIView):
                 {"error": str(e)},
                 status=502
             )
+
+class MLView(APIView):
+    def post(self, request):
+        try:
+            res = requests.post(
+                url=f'{ML_SERVICE_URL}/api/ml/analyze',
+                json=request.data,
+                headers={
+                    "Authorization": request.headers.get("Authorization", "")
+                },
+                timeout=10
+            )
+        except Exception as e:
+            return Response({'details':f'something went wrong {e}'},status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(data=res.json(), status=res.status_code)

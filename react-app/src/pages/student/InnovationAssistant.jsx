@@ -14,25 +14,31 @@ export default function InnovationAssistant() {
   const { toast } = useToast();
 
   async function analyze() {
-    if (idea.trim().length < 20) {
-      toast('Please describe your idea in a bit more detail.', 'error');
-      return;
-    }
-    setLoading(true);
-    setResult(null);
-    try {
-      // In production these two calls can be combined server-side into one endpoint.
-      const [{ data: scores }, { data: rec }] = await Promise.all([
-        innovationService.analyze(idea),
-        innovationService.suggestions(idea, []),
-      ]);
-      setResult({ scores, ...rec });
-    } catch (err) {
-      toast(err.message || 'Could not analyze your idea right now.', 'error');
-    } finally {
-      setLoading(false);
-    }
+  if (idea.trim().length < 20) {
+    toast('Please describe your idea in a bit more detail.', 'error');
+    return;
   }
+
+  setLoading(true);
+  setResult(null);
+
+  try {
+    const response = await innovationService.analyze(idea, []);
+
+    setResult(response.data);
+  } catch (err) {
+    console.error('Innovation analysis error:', err);
+
+    toast(
+      err.response?.data?.detail ||
+      err.message ||
+      'Could not analyze your idea right now.',
+      'error'
+    );
+  } finally {
+    setLoading(false);
+  }
+}
 
   return (
     <>
@@ -66,10 +72,10 @@ export default function InnovationAssistant() {
       {result && (
         <>
           <div className="row g-3 mb-4">
-            <div className="col-6 col-lg-3"><ScoreCard label="Similarity Score" value={result.scores.similarity} caption="How closely this matches existing projects" /></div>
-            <div className="col-6 col-lg-3"><ScoreCard label="Originality" value={result.scores.originality} caption="How unique your framing and features are" /></div>
-            <div className="col-6 col-lg-3"><ScoreCard label="Innovation Potential" value={result.scores.innovation} caption="Headroom for standout features" /></div>
-            <div className="col-6 col-lg-3"><ScoreCard label="Innovation Gap" value={result.scores.gap} caption="Distance to top-tier submissions" /></div>
+            <div className="col-6 col-lg-3"><ScoreCard label="Similarity Score" value={result.similarity} caption="How closely this matches existing projects" /></div>
+            <div className="col-6 col-lg-3"><ScoreCard label="Originality" value={result.originality} caption="How unique your framing and features are" /></div>
+            <div className="col-6 col-lg-3"><ScoreCard label="Innovation Potential" value={result.innovation} caption="Headroom for standout features" /></div>
+            <div className="col-6 col-lg-3"><ScoreCard label="Innovation Gap" value={result.gap} caption="Distance to top-tier submissions" /></div>
           </div>
 
           <div className="row g-4">

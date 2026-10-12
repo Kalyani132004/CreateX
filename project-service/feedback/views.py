@@ -29,25 +29,29 @@ class ProjectFeedbackView(APIView):
         POST /projects/<project_id>/feedback/
         """
 
+        # request.user comes from the JWT token (MicroserviceJWTAuthentication)
+        if request.user.role != "faculty":
+            return Response(
+                {"detail": "Only faculty can give feedback."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        faculty_id = request.user.id
+
+        # one faculty = one feedback row per project
+        # (Submit Feedback and Submit Recommendation update the same row)
+        old_feedback = Feedback.objects.filter(
+            project_id=project_id,
+            faculty_id=faculty_id
+        ).first()
+
         serializer = FeedbackSerializer(
-            data=request.data
+            old_feedback,
+            data=request.data,
+            partial=True
         )
 
         if serializer.is_valid():
-
-            # IMPORTANT:
-            # This assumes your gateway/authentication
-            # puts faculty ID in the request headers.
-            faculty_id = request.headers.get("X-User-ID")
-
-            if not faculty_id:
-                return Response(
-                    {
-                        "detail": "Faculty authentication required."
-                    },
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-
             serializer.save(
                 project_id=project_id,
                 faculty_id=faculty_id

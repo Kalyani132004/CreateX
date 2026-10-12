@@ -8,12 +8,14 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import NotFound
 
-from urllib3 import Retry
-
 from .models import Project, ProjectImage, Wishlist
 from .serializers import ProjectSerializer, WishlistSerializer
 from django.conf import settings
 import requests
+from django.db.models import Q
+
+
+
 def get_owner_name(unique_id, token):
         if not unique_id:
             return "Unknown Student"
@@ -49,23 +51,94 @@ def get_owner_name(unique_id, token):
             print("AUTH SERVICE ERROR:",e)
         return "Unknown Student"
 
+
+def calculate_scores(project):
+    """Ask the ML service for innovation + similarity and save them on the project."""
+    existing = []
+    for other in Project.objects.exclude(id=project.id):
+        existing.append({
+            "id": other.id,
+            "title": other.title,
+            "description": other.description,
+            "domain": other.domain,
+            "technologies": other.technologies or [],
+        })
+
+    try:
+        response = requests.post(
+            f"{settings.ML_SERVICE_URL}/api/ml/analyze",
+            json={
+                "title": project.title,
+                "description": project.description,
+                "domain": project.domain,
+                "technologies": project.technologies or [],
+                "existing_projects": existing,
+            },
+            timeout=30,
+        )
+
+        if response.status_code == 200:
+            ml = response.json()
+            project.similarity = ml.get("similarity", 0)
+            project.innovation = ml.get("innovation", 0)
+            project.save()
+        else:
+            print("ML service returned:", response.status_code, response.text)
+
+    except requests.RequestException as e:
+        # project must still be saved even if ML service is down
+        print("ML SERVICE ERROR:", e)
+
+
 class ProjectListCreateView(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request):
-        projects = (
-            Project.objects
-            .all()
-            .order_by("-created_at")
-        )
+        projects = Project.objects.all()
+
+        # values coming from the URL, like ?q=diet&domain=IoT
+        q = request.query_params.get("q")
+        domain = request.query_params.get("domain")
+        technology = request.query_params.get("technology")
+        course = request.query_params.get("course")
+        batch = request.query_params.get("batch")
+        sort = request.query_params.get("sort")
+
+        # search text: check title, description, domain, student name and technologies
+        if q:
+            projects = projects.filter(
+                Q(title__icontains=q)
+                | Q(description__icontains=q)
+                | Q(domain__icontains=q)
+                | Q(owner_name__icontains=q)
+                | Q(technologies__icontains=q)
+            )
+
+        if domain:
+            projects = projects.filter(domain=domain)
+
+        if technology:
+            projects = projects.filter(technologies__icontains=technology)
+
+        if course:
+            projects = projects.filter(course=course)
+
+        if batch:
+            projects = projects.filter(batch=batch)
+
+        # sorting
+        if sort == "innovation":
+            projects = projects.order_by("-innovation")
+        else:
+            # "recent" and "relevant" both show newest first
+            projects = projects.order_by("-created_at")
 
         serializer = ProjectSerializer(
             projects,
-            many=True
+            many=True,
+            context={"request": request}
         )
 
-        return Response(
-            serializer.data
-        )
+        return Response(serializer.data)
 
     def post(self, request):
         serializer = ProjectSerializer(data=request.data)
@@ -78,6 +151,9 @@ class ProjectListCreateView(APIView):
                 request.headers.get("Authorization")
             )
         )
+
+        # calculate innovation + similarity score
+        calculate_scores(project)
 
         images = request.FILES.getlist("images")
 
@@ -340,3 +416,52 @@ class WishlistCreateListView(APIView):
             {"detail": "Project removed from wishlist."},
             status=status.HTTP_200_OK
         )
+
+
+class FacultyStatsView(APIView):
+    """GET /projects/faculty-stats/"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from feedback.models import Feedback
+
+        my_feedback = Feedback.objects.filter(faculty_id=request.user.id)
+
+        data = {
+            "projects_reviewed": my_feedback.values("project_id").distinct().count(),
+            "feedback_given": my_feedback.count(),
+            "recommendations_given": my_feedback.exclude(recommendation="").count(),
+        }
+        return Response(data)
+
+
+class StudentStatsView(APIView):
+    """GET /projects/student-stats/  -> project count and avg innovation per student"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from django.db.models import Count, Avg, Q
+
+        rows = (
+            Project.objects
+            .values("owner_id")
+            .annotate(
+                project_count=Count("id"),
+                # only projects that really have a score (0 means not scored yet)
+                avg_innovation=Avg("innovation", filter=Q(innovation__gt=0)),
+            )
+        )
+
+        data = []
+        for row in rows:
+            data.append({
+                "owner_id": row["owner_id"],
+                "project_count": row["project_count"],
+                "avg_innovation": (
+                    round(row["avg_innovation"])
+                    if row["avg_innovation"] is not None
+                    else None
+                ),
+            })
+
+        return Response(data)

@@ -38,16 +38,17 @@ export function AuthProvider({ children }) {
   // Student login
   async function loginStudent(uid, password) {
     const res = await authService.studentLogin(uid, password);
-
+    console.log(JSON.stringify(res))
     localStorage.setItem('cx_token', res.data.access_token);
     localStorage.setItem('cx_refresh_token', res.data.refresh_token);
 
+    //identify the user
     setUser({
       ...res.data.student,
       role: 'student',
     });
   }
-
+  
   // Faculty login
   async function loginFaculty(staffId, password) {
     const res = await authService.facultyLogin(staffId, password);

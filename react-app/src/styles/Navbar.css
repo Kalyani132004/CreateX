@@ -1,0 +1,53 @@
+/* Navbar additions — leaves your existing .cx-topbar rules in charge of layout. */
+
+.nb { gap: 0.75rem; }
+
+.nb-icon-btn { padding: 8px; min-width: 40px; min-height: 40px; display: inline-grid; place-items: center; }
+.nb-icon-lg { font-size: 1.3rem; }
+.nb-icon-md { font-size: 1.1rem; }
+
+/* Search */
+.nb-search-wrap { flex: 1 1 auto; max-width: 480px; min-width: 0; }
+.nb-search { width: 100%; margin: 0; }
+.nb-search input { min-width: 0; }
+.nb-search input::-webkit-search-cancel-button { cursor: pointer; }
+.nb-kbd {
+  flex: none; padding: 1px 7px; border-radius: 6px; font-size: 0.7rem; font-family: inherit;
+  color: var(--c-muted, #5b6270); border: 1px solid var(--c-border-soft, rgba(127, 127, 127, 0.3));
+  background: transparent;
+}
+.nb-search:focus-within .nb-kbd { display: none; }
+
+/* Needs .cx-topbar to be positioned (sticky/fixed/relative), which it normally is. */
+.nb-mobile-search {
+  position: absolute; left: 0; right: 0; top: 100%; z-index: 5;
+  padding: 0.5rem 0.75rem;
+  background: var(--c-surface, #fff);
+  border-bottom: 1px solid var(--c-border-soft, rgba(127, 127, 127, 0.2));
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
+}
+
+/* Notification badge: only rendered when there is something unread */
+.nb-badge {
+  position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 999px; font-size: 0.625rem; font-weight: 700; line-height: 16px; text-align: center;
+  background: var(--c-accent, #dc2626); color: #fff;
+}
+
+/* Account menu */
+.nb-user {
+  display: inline-flex; align-items: center; gap: 0.5rem; padding: 4px 6px; border: 0; border-radius: 999px;
+  background: transparent; cursor: pointer; transition: background 0.15s ease;
+}
+.nb-user:hover { background: rgba(127, 127, 127, 0.12); }
+.nb-user-name { font-size: 0.875rem; font-weight: 600; color: var(--c-ink, #1b1f2a); }
+.nb-chevron { font-size: 0.7rem; color: var(--c-muted, #5b6270); }
+
+.nb-menu { min-width: 220px; border-radius: var(--r-sm, 8px); border-color: var(--c-border-soft, rgba(127, 127, 127, 0.2)); }
+.nb-menu-head { display: flex; flex-direction: column; gap: 2px; padding: 0.5rem 1rem; }
+.nb-menu-head strong { font-size: 0.875rem; color: var(--c-ink, #1b1f2a); overflow-wrap: anywhere; }
+.nb-menu-head small { font-size: 0.75rem; color: var(--c-muted, #5b6270); overflow-wrap: anywhere; }
+.nb-menu-head .cx-badge { align-self: flex-start; margin-top: 4px; text-transform: capitalize; }
+
+.nb :is(button, a, input):focus-visible { outline: 2px solid var(--c-primary, #4f46e5); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .nb-user { transition: none; } }

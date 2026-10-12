@@ -1,0 +1,68 @@
+{
+    "Web Development": [
+        "React",
+        "Django",
+        "Node.js",
+        "PostgreSQL",
+        "Docker",
+        "Firebase"
+    ],
+
+    "Mobile Application": [
+        "Flutter",
+        "Firebase",
+        "React Native",
+        "Node.js",
+        "TensorFlow"
+    ],
+
+    "Data Science": [
+        "Python",
+        "Pandas",
+        "NumPy",
+        "Scikit-learn",
+        "Jupyter",
+        "Matplotlib"
+    ],
+
+    "AI / ML": [
+        "Python",
+        "TensorFlow",
+        "PyTorch",
+        "Scikit-learn",
+        "Pandas",
+        "NumPy"
+    ],
+
+    "Cyber Security": [
+        "Python",
+        "Docker",
+        "Linux",
+        "Wireshark",
+        "Firebase"
+    ],
+
+    "IoT": [
+        "Python",
+        "Firebase",
+        "Arduino",
+        "Raspberry Pi",
+        "AWS"
+    ],
+
+    "Cloud Computing": [
+        "AWS",
+        "Docker",
+        "Kubernetes",
+        "PostgreSQL",
+        "Python"
+    ],
+
+    "Software Development": [
+        "Java",
+        "Spring Boot",
+        "PostgreSQL",
+        "Docker",
+        "React"
+    ]
+}
