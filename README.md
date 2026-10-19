@@ -120,12 +120,3 @@ Open `http://localhost:5173` in your browser.
 | POST | `/api/auth/student/refresh/` | Refresh access token |
 | GET | `/api/auth/student/me/` | Get student profile |
 
-## Roadmap
-
-- [ ] Faculty authentication
-- [ ] Project submission and wishlist
-- [ ] Project similarity and Innovation Score
-- [ ] Faculty feedback
-- [ ] Secure logout and password recovery
-- [ ] Docker Compose integration
-
